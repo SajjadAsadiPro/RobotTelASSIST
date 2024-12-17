@@ -1,3 +1,4 @@
+process.env.NTBA_FIX_319 = 1;
 const TelegramBot = require("node-telegram-bot-api");
 const axios = require("axios");
 const XLSX = require("xlsx");
@@ -225,7 +226,7 @@ bot.on("photo", (msg) => {
 
     if (dest_id === "@FILmoseriyalerooz_bot") {
       caption =
-        caption.split("📥 لینک دانلود رایگان پرسرعت 📥")[0] +
+        caption.split("📥 لینک ")[0] +
         "\n@filmoseriyalerooz_bot";
     } else if (dest_id === "@GlobCinema") {
       caption =
