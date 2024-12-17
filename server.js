@@ -1,119 +1,277 @@
-/**
- * This is the main Node.js server script for your project
- * Check out the two endpoints this back-end API provides in fastify.get and fastify.post below
- */
+const TelegramBot = require("node-telegram-bot-api");
+const axios = require("axios");
+const XLSX = require("xlsx");
 
-const path = require("path");
+// تنظیم توکن ربات تلگرام
+const token = "7664292180:AAF8gZ2fSS5Kn_uV9q9bHR48DOKakf4vtYg";
+const bot = new TelegramBot(token, { polling: true });
 
-// Require the fastify framework and instantiate it
-const fastify = require("fastify")({
-  // Set this to true for detailed logging:
-  logger: false,
-});
+// متغیرهای وضعیت ربات
+let rowIndexStart = 0;
+let persianNames = [];
+let englishNames = [];
+let linksList = [];
+let countryNames = [];
+let productionYears = [];
 
-// ADD FAVORITES ARRAY VARIABLE FROM TODO HERE
-
-// Setup our static files
-fastify.register(require("@fastify/static"), {
-  root: path.join(__dirname, "public"),
-  prefix: "/", // optional: default '/'
-});
-
-// Formbody lets us parse incoming forms
-fastify.register(require("@fastify/formbody"));
-
-// View is a templating manager for fastify
-fastify.register(require("@fastify/view"), {
-  engine: {
-    handlebars: require("handlebars"),
+// دکمه‌ها و آیدی‌های مبدا و مقصد
+const mappings = {
+  ایرانی: {
+    source_id: "@MrMoovie",
+    dest_id: "@FILmoseriyalerooz_bot",
   },
-});
+  خارجی: {
+    source_id: "@towfilm",
+    dest_id: "@GlobCinema",
+  },
+  ترکیبی: {
+    dest_id: "@GlobCinema",
+  },
+};
 
-// Load and parse SEO data
-const seo = require("./src/seo.json");
-if (seo.url === "glitch-default") {
-  seo.url = `https://${process.env.PROJECT_DOMAIN}.glitch.me`;
-}
+// ذخیره آیدی‌ها برای کاربران
+const userMappings = {};
 
-/**
- * Our home page route
- *
- * Returns src/pages/index.hbs with data built into it
- */
-fastify.get("/", function (request, reply) {
-  // params is an object we'll pass to our handlebars template
-  let params = { seo: seo };
+// صف ارسال پیام
+const messageQueue = [];
+let isProcessing = false;
 
-  // If someone clicked the option for a random color it'll be passed in the querystring
-  if (request.query.randomize) {
-    // We need to load our color data file, pick one at random, and add it to the params
-    const colors = require("./src/colors.json");
-    const allColors = Object.keys(colors);
-    let currentColor = allColors[(allColors.length * Math.random()) << 0];
+// افزودن پیام به صف
+const addToQueue = (task) => {
+  messageQueue.push(task);
+  processQueue();
+};
 
-    // Add the color properties to the params object
-    params = {
-      color: colors[currentColor],
-      colorError: null,
-      seo: seo,
-    };
+// پردازش صف
+const processQueue = async () => {
+  if (isProcessing || messageQueue.length === 0) return;
+  isProcessing = true;
+
+  const task = messageQueue.shift();
+  try {
+    await task(); // اجرای پیام
+  } catch (error) {
+    console.error("خطا در پردازش صف:", error);
   }
 
-  // The Handlebars code will be able to access the parameter values and build them into the page
-  return reply.view("/src/pages/index.hbs", params);
+  isProcessing = false;
+  processQueue(); // ادامه پردازش پیام‌های بعدی
+};
+
+// فرمان /start
+bot.onText(/\/start/, (msg) => {
+  const chatId = msg.chat.id;
+  const options = {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "ایرانی", callback_data: "ایرانی" },
+          { text: "خارجی", callback_data: "خارجی" },
+          { text: "ترکیبی", callback_data: "ترکیبی" },
+        ],
+        [{ text: "ریستارت ربات", callback_data: "ریستارت" }],
+      ],
+    },
+  };
+
+  bot.sendMessage(chatId, "سلام! لطفاً یک گزینه انتخاب کنید:", options);
+  // ریست کردن تمام داده‌های قبلی
+  persianNames = [];
+  englishNames = [];
+  linksList = [];
+  countryNames = [];
+  productionYears = [];
+  rowIndexStart = 0;
+
+  bot.sendMessage(
+    chatId,
+    "ربات از اول شروع شد! لطفا ابتدا یک فایل اکسل ارسال کنید که شامل نام‌های فارسی، نام‌های انگلیسی، سال تولید، کشورها و لینک‌ها باشد."
+  );
 });
 
-/**
- * Our POST route to handle and react to form submissions
- *
- * Accepts body data indicating the user choice
- */
-fastify.post("/", function (request, reply) {
-  // Build the params object to pass to the template
-  let params = { seo: seo };
+// مدیریت دستور `/rowstart` برای تنظیم ردیف شروع
+bot.onText(/\/rowstart (\d+)/, (msg, match) => {
+  const chatId = msg.chat.id;
 
-  // If the user submitted a color through the form it'll be passed here in the request body
-  let color = request.body.color;
+  // بررسی صحت ورودی
+  const rowStartInput = parseInt(match[1], 10);
+  if (isNaN(rowStartInput) || rowStartInput < 1) {
+    bot.sendMessage(chatId, "❌ لطفاً یک شماره معتبر (بزرگتر از ۰) وارد کنید.");
+    return;
+  }
 
-  // If it's not empty, let's try to find the color
-  if (color) {
-    // ADD CODE FROM TODO HERE TO SAVE SUBMITTED FAVORITES
+  rowIndexStart = rowStartInput - 1;
+  bot.sendMessage(
+    chatId,
+    `✅ شماره ردیف شروع به ${rowStartInput} تنظیم شد. اکنون فایل اکسل را ارسال کنید.`
+  );
+});
 
-    // Load our color data file
-    const colors = require("./src/colors.json");
+// هندلر برای انتخاب دکمه
+bot.on("callback_query", (query) => {
+  const chatId = query.message.chat.id;
+  const selectedOption = query.data;
 
-    // Take our form submission, remove whitespace, and convert to lowercase
-    color = color.toLowerCase().replace(/\s/g, "");
+  if (mappings[selectedOption]) {
+    const { source_id, dest_id } = mappings[selectedOption];
+    userMappings[chatId] = { source_id, dest_id };
 
-    // Now we see if that color is a key in our colors object
-    if (colors[color]) {
-      // Found one!
-      params = {
-        color: colors[color],
-        colorError: null,
-        seo: seo,
-      };
+    bot.sendMessage(chatId, `تنظیمات ${selectedOption} با موفقیت ذخیره شد.`);
+    bot.sendMessage(
+      chatId,
+      "حالا هر پیام یا رسانه‌ای که ارسال کنید، آیدی‌ها تغییر خواهند کرد."
+    );
+  }
+
+  if (selectedOption === "ریستارت") {
+    delete userMappings[chatId];
+    bot.sendMessage(chatId, "ربات با موفقیت ریستارت شد.");
+  }
+});
+
+// دریافت فایل اکسل
+bot.on("document", async (msg) => {
+  const chatId = msg.chat.id;
+  const fileId = msg.document.file_id;
+
+  try {
+    // دریافت فایل
+    const file = await bot.getFile(fileId);
+    const fileUrl = `https://api.telegram.org/file/bot${token}/${file.file_path}`;
+    const response = await axios.get(fileUrl, { responseType: "arraybuffer" });
+
+    // خواندن فایل اکسل
+    const workbook = XLSX.read(response.data, { type: "buffer" });
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+
+    // استخراج داده‌ها از شیت اکسل
+    const data = XLSX.utils.sheet_to_json(sheet);
+
+    persianNames = data.map((row) => row["نام فارسی"] || "");
+    englishNames = data.map((row) => row["نام انگلیسی"] || "");
+    linksList = data.map((row) => row["لینک در کانال"] || "");
+    countryNames = data.map((row) => row["کشور"] || "");
+    productionYears = data.map((row) => row["سال تولید"] || "بدون اطلاعات");
+
+    bot.sendMessage(
+      chatId,
+      "فایل اکسل با موفقیت بارگذاری شد. در حال پردازش اطلاعات..."
+    );
+
+    if (
+      persianNames.length === englishNames.length &&
+      englishNames.length === linksList.length &&
+      linksList.length === countryNames.length &&
+      countryNames.length === productionYears.length
+    ) {
+      let message = "";
+      let maxMessageLength = 3800;
+
+      for (let i = rowIndexStart; i < englishNames.length; i++) {
+        if (
+          !persianNames[i] ||
+          !englishNames[i] ||
+          !linksList[i] ||
+          !countryNames[i]
+        ) {
+          continue;
+        }
+
+        const filmMessage = `${i + 1} - <b>${persianNames[i]}</b> (${
+          productionYears[i]
+        }) ${countryNames[i]}  👇\n😍 <a href="${linksList[i]}">"${
+          englishNames[i]
+        }"</a>\n\n`;
+
+        if (message.length + filmMessage.length > maxMessageLength) {
+          await bot.sendMessage(chatId, message, {
+            parse_mode: "HTML",
+            disable_web_page_preview: true,
+          });
+          message = "";
+        }
+
+        message += filmMessage;
+      }
+
+      if (message.trim().length > 0) {
+        message += "\n@GlobCinema\n@Filmoseriyalerooz_Bot";
+        await bot.sendMessage(chatId, message, {
+          parse_mode: "HTML",
+          disable_web_page_preview: true,
+        });
+      }
     } else {
-      // No luck! Return the user value as the error property
-      params = {
-        colorError: request.body.color,
-        seo: seo,
-      };
+      bot.sendMessage(
+        chatId,
+        "تعداد نام‌های فارسی، نام‌های انگلیسی، لینک‌ها، سال تولید و کشورها باید برابر باشد. لطفا دوباره امتحان کنید."
+      );
     }
+  } catch (error) {
+    console.error("Error processing the Excel file:", error);
+    bot.sendMessage(chatId, "❌ خطا در پردازش فایل اکسل.");
   }
-
-  // The Handlebars template will use the parameter values to update the page with the chosen color
-  return reply.view("/src/pages/index.hbs", params);
 });
 
-// Run the server and report out to the logs
-fastify.listen(
-  { port: process.env.PORT, host: "0.0.0.0" },
-  function (err, address) {
-    if (err) {
-      console.error(err);
-      process.exit(1);
+// پردازش تصاویر
+bot.on("photo", (msg) => {
+  const chatId = msg.chat.id;
+  const userMapping = userMappings[chatId];
+  let caption = msg.caption || "";
+
+  if (userMapping) {
+    const { dest_id } = userMapping;
+
+    if (dest_id === "@FILmoseriyalerooz_bot") {
+      caption =
+        caption.split("📥 لینک دانلود رایگان پرسرعت 📥")[0] +
+        "\n@filmoseriyalerooz_bot";
+    } else if (dest_id === "@GlobCinema") {
+      caption =
+        caption.split("➰ لینک دانلود:")[0] +
+        "\n❤️@GlobCinema\n❤️@GlobCinemaNews";
     }
-    console.log(`Your app is listening on ${address}`);
   }
-);
+
+  addToQueue(() => bot.sendPhoto(chatId, msg.photo[0].file_id, { caption }));
+});
+
+// پردازش ویدیو
+bot.on("video", (msg) => {
+  const chatId = msg.chat.id;
+  const userMapping = userMappings[chatId];
+  let caption = msg.caption || "";
+
+  if (userMapping) {
+    const { dest_id } = userMapping;
+
+    if (dest_id === "@FILmoseriyalerooz_bot" && caption.includes("@MrMoovie")) {
+      caption = caption.replace("@MrMoovie", "@FILmoseriyalerooz_bot");
+    } else if (dest_id === "@GlobCinema" && caption.includes("@towfilm")) {
+      caption = caption.replace("@towfilm", "@GlobCinema");
+    }
+  }
+
+  addToQueue(() => bot.sendVideo(chatId, msg.video.file_id, { caption }));
+});
+
+// پردازش پیام‌های متنی
+bot.on("message", (msg) => {
+  const chatId = msg.chat.id;
+
+  if (msg.text && msg.text !== "/start") {
+    let messageText = msg.text;
+
+    const userMapping = userMappings[chatId];
+    if (userMapping) {
+      const { source_id, dest_id } = userMapping;
+
+      if (source_id && dest_id && messageText.includes(source_id)) {
+        messageText = messageText.replace(source_id, dest_id);
+      }
+
+      addToQueue(() => bot.sendMessage(chatId, messageText));
+    }
+  }
+});
