@@ -33,6 +33,65 @@ const mappings = {
 // ذخیره آیدی‌ها برای کاربران
 const userMappings = {};
 
+
+let replacementMappings = {}; // ذخیره متن‌ها و آیدی کانال
+
+// مدیریت دکمه جدید
+bot.onText(/\/setreplacement/, (msg) => {
+  const chatId = msg.chat.id;
+
+  bot.sendMessage(
+    chatId,
+    "لطفاً متنی که باید جایگزین شود را ارسال کنید (متن ابتدایی):"
+  );
+
+  bot.once("message", (initialMessage) => {
+    const initialText = initialMessage.text;
+
+    bot.sendMessage(
+      chatId,
+      "حالا متنی که باید جایگزین شود را ارسال کنید (متن جایگزین):"
+    );
+
+    bot.once("message", (replacementMessage) => {
+      const replacementText = replacementMessage.text;
+
+      bot.sendMessage(
+        chatId,
+        "لطفاً آیدی کانال مقصد را ارسال کنید (مثلاً: @YourChannel):"
+      );
+
+      bot.once("message", (channelMessage) => {
+        const channelId = channelMessage.text;
+
+        if (!channelId.startsWith("@")) {
+          bot.sendMessage(
+            chatId,
+            "❌ آیدی کانال نامعتبر است. لطفاً دوباره امتحان کنید."
+          );
+          return;
+        }
+
+        // ذخیره متن‌ها و کانال
+        replacementMappings[chatId] = {
+          initialText,
+          replacementText,
+          channelId,
+        };
+
+        bot.sendMessage(
+          chatId,
+          `✅ تنظیمات ذخیره شد:\n\n🔸 متن جایگزین: ${initialText} ➡️ ${replacementText}\n🔸 کانال مقصد: ${channelId}`
+        );
+      });
+    });
+  });
+});
+
+
+
+
+
 // صف ارسال پیام
 const messageQueue = [];
 let isProcessing = false;
@@ -273,6 +332,66 @@ bot.on("message", (msg) => {
       }
 
       addToQueue(() => bot.sendMessage(chatId, messageText));
+    }
+  }
+});
+
+
+
+
+
+
+
+
+bot.on("message", async (msg) => {
+  const chatId = msg.chat.id;
+
+  // بررسی آیا تنظیماتی برای این کاربر وجود دارد
+  const mapping = replacementMappings[chatId];
+  if (mapping) {
+    const { initialText, replacementText, channelId } = mapping;
+
+    // بررسی ریپلای شده
+    let replyToMessageId = null;
+    if (msg.reply_to_message) {
+      replyToMessageId = msg.reply_to_message.message_id;
+    }
+
+    // برای پیام متنی
+    if (msg.text && msg.text.includes(initialText)) {
+      const updatedText = msg.text.replace(initialText, replacementText);
+
+      // ارسال متن جایگزین‌شده به کانال
+      bot.sendMessage(channelId, updatedText, {
+        reply_to_message_id: replyToMessageId,
+      });
+
+      bot.sendMessage(chatId, "پیام متنی با متن جایگزین به کانال ارسال شد.");
+    }
+
+    // برای پیام‌هایی که کپشن دارند
+    if (msg.caption && msg.caption.includes(initialText)) {
+      const updatedCaption = msg.caption.replace(initialText, replacementText);
+
+      // ارسال پیام جایگزین‌شده به کانال
+      if (msg.photo) {
+        bot.sendPhoto(channelId, msg.photo[0].file_id, {
+          caption: updatedCaption,
+          reply_to_message_id: replyToMessageId,
+        });
+      } else if (msg.video) {
+        bot.sendVideo(channelId, msg.video.file_id, {
+          caption: updatedCaption,
+          reply_to_message_id: replyToMessageId,
+        });
+      } else if (msg.document) {
+        bot.sendDocument(channelId, msg.document.file_id, {
+          caption: updatedCaption,
+          reply_to_message_id: replyToMessageId,
+        });
+      }
+
+      bot.sendMessage(chatId, "پیام با متن جایگزین و کپشن به کانال ارسال شد.");
     }
   }
 });
