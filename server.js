@@ -129,7 +129,7 @@ bot.onText(/\/start/, (msg) => {
           { text: "خارجی", callback_data: "خارجی" },
           { text: "ترکیبی", callback_data: "ترکیبی" },
         ],
-        [{ text: "ریستارت ربات", callback_data: "ریستارت" }],
+        [{ text: "ریستارت ربات", callback_data: "Restart" }],
       ],
     },
   };
