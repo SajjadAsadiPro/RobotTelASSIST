@@ -4,8 +4,8 @@ const axios = require("axios");
 const XLSX = require("xlsx");
 
 // تنظیم توکن ربات تلگرام
-// const token = "7664292180:AAF8gZ2fSS5Kn_uV9q9bHR48DOKakf4vtYg";
-// const bot = new TelegramBot(token, { polling: true });
+const token = "7664292180:AAF8gZ2fSS5Kn_uV9q9bHR48DOKakf4vtYg";
+const bot = new TelegramBot(token, { polling: true });
 
 // متغیرهای وضعیت ربات
 let rowIndexStart = 0;
