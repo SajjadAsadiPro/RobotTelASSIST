@@ -197,7 +197,7 @@ bot.on("document", async (msg) => {
       }
 
       if (message.trim().length > 0) {
-        message += "\n@GlobCinema\n@Filmoseriyalerooz_Bot";
+        message += "\n@GlobCinema\nt.me/+GtX5gVcOHwZiODI0";
         await bot.sendMessage(chatId, message, {
           parse_mode: "HTML",
           disable_web_page_preview: true,
