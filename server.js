@@ -222,16 +222,12 @@ bot.on("photo", (msg) => {
   let caption = msg.caption || "";
 
   if (userMapping) {
-    const { dest_id } = userMapping;
+    const { source_id, dest_id } = userMapping;
 
     if (dest_id === "t.me/+GtX5gVcOHwZiODI0") {
-      caption =
-        caption.split("📥 لینک ")[0] +
-        "\nt.me/+GtX5gVcOHwZiODI0";
+      caption = caption.replace(/@MrMoovie/g, "t.me/+GtX5gVcOHwZiODI0");
     } else if (dest_id === "@GlobCinema") {
-      caption =
-        caption.split("➰ لینک دانلود:")[0] +
-        "\n❤️@GlobCinema\n❤️@GlobCinemaNews";
+      caption = caption.replace(/@towfilm/g, "@GlobCinema");
     }
   }
 
@@ -245,12 +241,12 @@ bot.on("video", (msg) => {
   let caption = msg.caption || "";
 
   if (userMapping) {
-    const { dest_id } = userMapping;
+    const { source_id, dest_id } = userMapping;
 
-    if (dest_id === "t.me/+GtX5gVcOHwZiODI0" && caption.includes("@MrMoovie")) {
-      caption = caption.replace("@MrMoovie", "t.me/+GtX5gVcOHwZiODI0");
-    } else if (dest_id === "@GlobCinema" && caption.includes("@towfilm")) {
-      caption = caption.replace("@towfilm", "@GlobCinema");
+    if (dest_id === "t.me/+GtX5gVcOHwZiODI0") {
+      caption = caption.replace(/@MrMoovie/g, "t.me/+GtX5gVcOHwZiODI0");
+    } else if (dest_id === "@GlobCinema") {
+      caption = caption.replace(/@towfilm/g, "@GlobCinema");
     }
   }
 
