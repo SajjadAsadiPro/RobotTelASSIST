@@ -21,7 +21,7 @@ let productionYears = [];
 const mappings = {
   ایرانی: {
     source_id: "@MrMoovie",
-    dest_id: "t.me/+GtX5gVcOHwZiODI0",
+    dest_id: " t.me/+GtX5gVcOHwZiODI0",
   },
   خارجی: {
     source_id: "@towfilm",
@@ -199,7 +199,7 @@ bot.on("document", async (msg) => {
       }
 
       if (message.trim().length > 0) {
-        message += "\n@GlobCinema\nt.me/+GtX5gVcOHwZiODI0";
+        message += "\n@GlobCinema\n t.me/+GtX5gVcOHwZiODI0";
         await bot.sendMessage(chatId, message, {
           parse_mode: "HTML",
           disable_web_page_preview: true,
@@ -226,8 +226,8 @@ bot.on("photo", (msg) => {
   if (userMapping) {
     const { source_id, dest_id } = userMapping;
 
-    if (dest_id === "t.me/+GtX5gVcOHwZiODI0") {
-      caption = caption.replace(/@MrMoovie/g, "t.me/+GtX5gVcOHwZiODI0");
+    if (dest_id === " t.me/+GtX5gVcOHwZiODI0") {
+      caption = caption.replace(/@MrMoovie/g, " t.me/+GtX5gVcOHwZiODI0");
     } else if (dest_id === "@GlobCinema") {
       caption = caption.replace(/@towfilm/g, "@GlobCinema");
     }
@@ -245,8 +245,8 @@ bot.on("video", (msg) => {
   if (userMapping) {
     const { source_id, dest_id } = userMapping;
 
-    if (dest_id === "t.me/+GtX5gVcOHwZiODI0") {
-      caption = caption.replace(/@MrMoovie/g, "t.me/+GtX5gVcOHwZiODI0");
+    if (dest_id === " t.me/+GtX5gVcOHwZiODI0") {
+      caption = caption.replace(/@MrMoovie/g, " t.me/+GtX5gVcOHwZiODI0");
     } else if (dest_id === "@GlobCinema") {
       caption = caption.replace(/@towfilm/g, "@GlobCinema");
     }
